@@ -1,13 +1,14 @@
 use std::ffi::OsStr;
 use std::path::Path;
 use std::{env, fs, io, path::PathBuf};
+use std::env::VarError;
 
-fn add_source<P: AsRef<Path>>(cfg: &mut cc::Build, path: P) -> io::Result<()> {
+fn add_source<P: AsRef<Path>>(cfg: &mut cc::Build, path: P) -> Result<(), io::Error> {
     for entry in fs::read_dir(path)? {
         let path = entry?.path();
         if path.is_dir() {
             add_source(cfg, path)?;
-        } else if path.extension().and_then(OsStr::to_str) == Some("cpp") {
+        } else if path.extension() == Some(OsStr::new("cpp")) {
             cfg.file(path);
         }
     }
@@ -17,37 +18,19 @@ fn add_source<P: AsRef<Path>>(cfg: &mut cc::Build, path: P) -> io::Result<()> {
 static ASMJIT_SOURCE_PATH: &str = "./asmjit/src";
 static BLEND2D_SOURCE_PATH: &str = "./blend2d/src";
 
-fn main() -> io::Result<()> {
-    let target = env::var("TARGET").unwrap();
-    let (arch, _vendor, sys, _abi) = {
-        let mut target_s = target.split('-');
-        (
-            target_s.next().unwrap(),
-            target_s.next().unwrap(),
-            target_s.next().unwrap(),
-            target_s.next().unwrap_or(""),
-        )
-    };
-    let (msvc, gnu, clang) = {
-        let tool = cc::Build::new().get_compiler();
-        (
-            tool.is_like_msvc(),
-            tool.is_like_gnu(),
-            tool.is_like_clang(),
-        )
-    };
-    let x64 = arch == "x86_64";
+fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
 
     // bindings
     let whitelist_regex = "[Bb][Ll].*";
-    let bindings = bindgen::builder()
+    let bindings = bindgen::Builder::default()
         .header("blend2d/src/blend2d.h")
         .layout_tests(false)
         .generate_comments(false)
-        .default_enum_style(bindgen::EnumVariation::ModuleConsts)
-        .whitelist_function(whitelist_regex)
-        .whitelist_type(whitelist_regex)
-        .whitelist_var(whitelist_regex)
+        .default_enum_style(bindgen::EnumVariation::NewType{is_bitfield: true, is_global: false})
+        .allowlist_function(whitelist_regex)
+        .allowlist_type(whitelist_regex)
+        .allowlist_var(whitelist_regex)
         .derive_debug(false)
         .clang_arg("-DASMJIT_STATIC")
         .generate()
@@ -58,9 +41,9 @@ fn main() -> io::Result<()> {
         .expect("Couldn't write bindings!");
 
     // lib
-    let mut cfg = cc::Build::new();
-    add_source(&mut cfg, BLEND2D_SOURCE_PATH)?;
-    add_source(&mut cfg, ASMJIT_SOURCE_PATH)?;
+    let mut cfg = Build::new(cc::Build::new());
+    add_source(&mut cfg, BLEND2D_SOURCE_PATH).unwrap();
+    add_source(&mut cfg, ASMJIT_SOURCE_PATH).unwrap();
     cfg.cpp(true)
         .warnings(false)
         .extra_warnings(false)
@@ -71,95 +54,97 @@ fn main() -> io::Result<()> {
         .include(BLEND2D_SOURCE_PATH)
         .define("ASMJIT_STATIC", None);
 
-    if let Some(s) = env::var_os("PROFILE") {
-        if &*s == "release" || &*s == "bench" {
-            cfg.define("NDEBUG", None);
-        }
+    let arch = get_env("CARGO_CFG_TARGET_ARCH").unwrap();
+
+
+    if get_env("PROFILE").is_some_and(|s| s != "debug") {
+        cfg.define("NDEBUG", None);
     }
 
-    if cfg!(feature = "sse2") {
-        cfg.define("BL_BUILD_OPT_SSE2", None);
-        if msvc {
-            cfg.define("__SSE2__", None);
-            if !x64 {
-                cfg.flag("-arch:SSE2");
+
+    match arch.as_str() {
+        "x86_64" | "i686" => {
+            // SSE2
+            cfg.define("BL_BUILD_OPT_SSE2", None);
+            cfg.mflag("-msse2", "/arch:SSE2");
+
+            // SSE3
+            cfg.define("BL_BUILD_OPT_SSE3", None);
+            cfg.mflag("-msse3", None);
+            if cfg.is_msvc {
+                cfg.define("__SSE3__", None);
             }
-        } else {
-            cfg.flag("-msse2");
-        }
-    }
-    if cfg!(feature = "sse3") {
-        cfg.define("BL_BUILD_OPT_SSE3", None);
-        if msvc {
-            cfg.define("__SSE3__", None);
-            if !x64 {
-                cfg.flag("-arch:SSE2");
+
+            // SSSE3
+            cfg.define("BL_BUILD_OPT_SSSE3", None);
+            cfg.mflag("-mssse3", None);
+            if cfg.is_msvc {
+                cfg.define("__SSSE3__", None);
             }
-        } else {
-            cfg.flag("-msse3");
-        }
-    }
-    if cfg!(feature = "ssse3") {
-        cfg.define("BL_BUILD_OPT_SSSE3", None);
-        if msvc {
-            cfg.define("__SSSE3__", None);
-            if !x64 {
-                cfg.flag("-arch:SSE2");
+
+            // SSE4.1
+            cfg.define("BL_BUILD_OPT_SSE4_1", None);
+            cfg.mflag("-msse4.1", None);
+            if cfg.is_msvc {
+                cfg.define("__SSE4_1__", None);
             }
-        } else {
-            cfg.flag("-mssse3");
+
+            // SSE4.2
+            cfg.define("BL_BUILD_OPT_SSE4_2", None);
+            cfg.mflags(["-mpopcnt", "-mpclmul", "-msse4.2"], "/arch:SSE4.2");
+
+            // AVX
+            cfg.define("BL_BUILD_OPT_AVX", None);
+            cfg.mflags(["-mpopcnt", "-mpclmul", "-mavx"], "/arch:AVX");
+
+            // AVX2
+            cfg.define("BL_BUILD_OPT_AVX2", None);
+            cfg.mflags(["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx2"], "/arch:AVX2");
+
+            // AVX512 (Disabled for now, breaks runtime detection)
+            // cfg.define("BL_BUILD_OPT_AVX512", None);
+            // cfg.mflags(["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx512f", "-mavx512bw", "-mavx512dq", "-mavx512cd", "-mavx512vl"], "/arch:AVX512");
         }
-    }
-    if cfg!(feature = "sse4_1") {
-        cfg.define("BL_BUILD_OPT_SSE4_1", None);
-        if msvc {
-            cfg.define("__SSE4_1__", None);
-            if !x64 {
-                cfg.flag("-arch:SSE2");
+        "aarch64" | "arm" => {
+            // TODO: transfer flags from CMakeLists.txt
+            let is_aarch64 = arch == "aarch64";
+
+            if cfg.is_msvc {
+                cfg.define("__ARM_NEON__", None);
             }
-        } else {
-            cfg.flag("-msse4.1");
+            cfg.mflag(
+                if is_aarch64 {
+                    "-march=armv8-a+crc+simd"
+                } else {
+                    "-mfpu=neon"
+                },
+                None,
+            );
         }
-    }
-    if cfg!(feature = "sse4_2") {
-        cfg.define("BL_BUILD_OPT_SSE4_2", None);
-        if msvc {
-            cfg.define("__SSE4_2__", None);
-            if !x64 {
-                cfg.flag("-arch:SSE2");
-            }
-        } else {
-            cfg.flag("-msse4.2");
-        }
-    }
-    if cfg!(feature = "avx") {
-        cfg.define("BL_BUILD_OPT_AVX", None);
-        if msvc {
-            cfg.flag("-arch:AVX");
-        } else {
-            cfg.flag("-mavx");
-        }
-    }
-    if cfg!(feature = "avx2") {
-        cfg.define("BL_BUILD_OPT_AVX2", None);
-        if msvc {
-            cfg.flag("-arch:AVX2");
-        } else {
-            cfg.flag("-mavx2");
-        }
+        _ => {}
     }
 
-    if clang || gnu {
+    if cfg.is_msvc {
+        cfg.flag("-MP")
+            .flag("-GR-")
+            .flag("-GF")
+            .flag("-Zc:__cplusplus")
+            .flag("-Zc:inline")
+            .flag("-Zc:strictStrings")
+            .flag("-Zc:threadSafeInit-");
+    } else {
         cfg.flag("-fvisibility=hidden")
             .flag("-fno-exceptions")
             .flag("-fno-rtti")
             .flag("-fno-math-errno")
+            .flag("-fno-semantic-interposition")
+            .flag("-fno-threadsafe-statics")
             .flag("-fmerge-all-constants")
             .flag("-ftree-vectorize");
     }
 
     cfg.compile("blend2d");
-    match sys {
+    match get_env("CARGO_CFG_TARGET_OS").unwrap().as_str() {
         "windows" => {
             println!("cargo:rustc-link-lib=user32");
             println!("cargo:rustc-link-lib=uuid");
@@ -171,12 +156,81 @@ fn main() -> io::Result<()> {
             println!("cargo:rustc-link-lib=pthread");
             println!("cargo:rustc-link-lib=rt");
         },
-        "darwin" => {
+        "macos" => {
             println!("cargo:rustc-link-lib=c");
             println!("cargo:rustc-link-lib=m");
             println!("cargo:rustc-link-lib=pthread");
         },
         _ => (),
     }
-    Ok(())
+}
+
+fn get_env(name: &str) -> Option<String> {
+    println!("cargo:rerun-if-env-changed={name}");
+    match env::var(name) {
+        Ok(s) => Some(s),
+        Err(VarError::NotPresent) => None,
+        Err(VarError::NotUnicode(s)) => {
+            panic!("unrecognize env var of {name}: {:?}", s.to_string_lossy());
+        }
+    }
+}
+
+// Based on rust-lang/libz-sys/zng/cc.rs
+// Apache 2.0 or MIT Alex Crichton, Josh Triplett, Sebastian Thiel
+struct Build {
+    cfg: cc::Build,
+    is_msvc: bool,
+}
+
+impl Build {
+    fn new(cfg: cc::Build) -> Self {
+        let is_msvc = cfg.try_get_compiler().unwrap().is_like_msvc();
+        Self { cfg, is_msvc }
+    }
+
+    fn mflag(
+        &mut self,
+        non_msvc: impl Into<Option<&'static str>>,
+        msvc: impl Into<Option<&'static str>>,
+    ) {
+        let Some(flag) = (if self.is_msvc {
+            msvc.into()
+        } else {
+            non_msvc.into()
+        }) else {
+            return;
+        };
+        self.cfg.flag(flag);
+    }
+
+    pub fn mflags<Iter>(&mut self, non_msvc: Iter, msvc: impl Into<Option<&'static str>>)
+    where
+        Iter: IntoIterator,
+        Iter::Item: AsRef<OsStr>,
+    {
+        if self.is_msvc {
+            if let Some(flag) = msvc.into() {
+                self.cfg.flag(flag);
+            }
+        } else {
+            for flag in non_msvc {
+                self.cfg.flag(flag);
+            }
+        }
+    }
+}
+
+impl std::ops::Deref for Build {
+    type Target = cc::Build;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cfg
+    }
+}
+
+impl std::ops::DerefMut for Build {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cfg
+    }
 }

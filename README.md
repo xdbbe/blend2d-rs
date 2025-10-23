@@ -3,7 +3,6 @@
 [![Build Status](https://travis-ci.com/Veykril/blend2d-rs.svg?branch=master)](https://travis-ci.com/Veykril/blend2d-rs)
 [![Crates.io](https://img.shields.io/crates/v/blend2d.svg)](https://crates.io/crates/blend2d)
 [![Docs.rs](https://docs.rs/blend2d/badge.svg)](https://docs.rs/blend2d)
-[![](https://tokei.rs/b1/github/Veykril/blend2d-rs)](https://github.com/Veykril/blend2d-rs)
 
 This crate provides rust bindings to the 
 [blend2d](https://github.com/blend2d/blend2d) lib.
@@ -25,9 +24,7 @@ This will hopefully change in the near future.
 
 ## Setup
 
-This crate requires [CMake](https://cmake.org/) to be installed and available on `PATH`.
-
-Also make sure to initialize the submodules after cloning the repository(`git submodule update --init`).
+Make sure to initialize the submodules after cloning the repository(`git submodule update --init`).
 
 ## Examples
 

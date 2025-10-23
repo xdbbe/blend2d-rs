@@ -2,15 +2,15 @@
 name = "blend2d"
 version = "0.3.0"
 authors = ["Lukas Wirth <lukastw97@gmail.com>"]
-edition = "2018"
+edition = "2024"
 description = "Rust bindings for blend2d"
-homepage = "https://github.com/Veykril/blend2d-rs"
-repository = "https://github.com/Veykril/blend2d-rs"
+homepage = "https://github.com/xdbbe/blend2d-rs"
+repository = "https://github.com/xdbbe/blend2d-rs"
 license = "MIT/Apache-2.0"
 categories = ["api-bindings"]
 readme = "README.md"
 exclude = ["assets/*", "examples/*"]
 
 [dependencies]
-ffi = { package = "blend2d-sys", version = "0.3.0", path = "blend2d-sys" }
+ffi = { package = "blend2d-sys", version = "0.4.0", path = "blend2d-sys" }
 bitflags = "1"

@@ -4,4 +4,3 @@
 [submodule "blend2d-sys/asmjit"]
 	path = blend2d-sys/asmjit
 	url = https://github.com/asmjit/asmjit
-	branch = next-wip
