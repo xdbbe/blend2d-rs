@@ -11,7 +11,7 @@ impl Image {
     pub fn new(w: i32, h: i32, format: BLFormat) -> Result<Self, Error> {
         let mut image = std::mem::MaybeUninit::<ffi::BLImageCore>::uninit();
         unsafe {
-            err_to_result(ffi::bl_image_init_as(image.as_mut_ptr(), w, h, format))?;
+            err_to_result(ffi::bl_image_create(image.as_mut_ptr(), w, h, format))?;
             Ok(Image(image.assume_init()))
         }
     }
