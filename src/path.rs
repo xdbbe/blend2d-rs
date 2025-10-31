@@ -21,6 +21,10 @@ impl Path {
     ) -> Result<(), Error> {
         err_to_result(unsafe { ffi::bl_path_cubic_to(&mut self.0, x1, y1, x2, y2, x3, y3) })
     }
+    #[inline]
+    pub fn line_to(&mut self, x: f64, y: f64) -> Result<(), Error> {
+        err_to_result(unsafe { ffi::bl_path_line_to(&mut self.0, x, y) })
+    }
 }
 
 impl Default for Path {
