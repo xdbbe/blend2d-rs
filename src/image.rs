@@ -37,9 +37,17 @@ impl Image {
         })
     }
     #[inline]
-    pub fn read_from_file(&mut self, filename: &CStr) -> Result<(), Error> {
+    pub fn read_from_file(filename: &CStr) -> Result<Self, Error> {
+        
+        let mut image = unsafe {
+            let mut image = std::mem::MaybeUninit::<ffi::BLImageCore>::uninit();
+            ffi::bl_image_init(image.as_mut_ptr());
+            image.assume_init()
+        };
+        
         err_to_result(unsafe {
-            ffi::bl_image_read_from_file(&mut self.0, filename.as_ptr(), null())
-        })
+            ffi::bl_image_read_from_file(&mut image, filename.as_ptr(), null())
+        })?;
+        Ok(Image(image))
     }
 }
