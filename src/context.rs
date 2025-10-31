@@ -1,8 +1,10 @@
 use std::ptr::null;
 
-use ffi;
+use ffi::{self, BLGeometryType, BLStrokeCapPosition, BLTransformOp};
 
-use crate::{Error, Gradient, err_to_result, image::Image, path::Path};
+use crate::{
+    Error, Gradient, err_to_result, geometry::StrokeCap, image::Image, path::Path, pattern::Pattern,
+};
 
 pub struct Context(ffi::BLContextCore);
 
@@ -60,6 +62,7 @@ impl Context {
     pub fn set_comp_op(&mut self, comp_op: CompOp) -> Result<(), Error> {
         err_to_result(unsafe { ffi::bl_context_set_comp_op(&mut self.0, comp_op as i32) })
     }
+    // Fill
     #[inline]
     pub fn fill_all(&mut self) -> Result<(), Error> {
         err_to_result(unsafe { ffi::bl_context_fill_all(&mut self.0) })
@@ -72,6 +75,12 @@ impl Context {
     pub fn set_fill_style_gradient(&mut self, gradient: &Gradient) -> Result<(), Error> {
         err_to_result(unsafe {
             ffi::bl_context_set_fill_style(&mut self.0, &raw const gradient.0 as _)
+        })
+    }
+    #[inline]
+    pub fn set_fill_style_pattern(&mut self, pattern: &Pattern) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_context_set_fill_style(&mut self.0, &raw const pattern.0 as _)
         })
     }
     #[inline]
@@ -88,7 +97,7 @@ impl Context {
         err_to_result(unsafe {
             ffi::bl_context_fill_geometry(
                 &mut self.0,
-                ffi::BLGeometryType::BL_GEOMETRY_TYPE_ROUND_RECT,
+                BLGeometryType::BL_GEOMETRY_TYPE_ROUND_RECT,
                 &raw const rect as _,
             )
         })
@@ -98,7 +107,7 @@ impl Context {
         err_to_result(unsafe {
             ffi::bl_context_fill_geometry(
                 &mut self.0,
-                ffi::BLGeometryType::BL_GEOMETRY_TYPE_PATH,
+                BLGeometryType::BL_GEOMETRY_TYPE_PATH,
                 &raw const path.0 as _,
             )
         })
@@ -108,9 +117,77 @@ impl Context {
         err_to_result(unsafe {
             ffi::bl_context_fill_geometry_rgba32(
                 &mut self.0,
-                ffi::BLGeometryType::BL_GEOMETRY_TYPE_PATH,
+                BLGeometryType::BL_GEOMETRY_TYPE_PATH,
                 &raw const path.0 as _,
                 rgba32,
+            )
+        })
+    }
+    #[inline]
+    pub fn fill_circle(&mut self, cx: f64, cy: f64, r: f64) -> Result<(), Error> {
+        let circle = ffi::BLCircle { cx, cy, r };
+        err_to_result(unsafe {
+            ffi::bl_context_fill_geometry(
+                &mut self.0,
+                BLGeometryType::BL_GEOMETRY_TYPE_CIRCLE,
+                &raw const circle as _,
+            )
+        })
+    }
+    // Stroke
+    #[inline]
+    pub fn set_stroke_width(&mut self, width: f64) -> Result<(), Error> {
+        err_to_result(unsafe { ffi::bl_context_set_stroke_width(&mut self.0, width) })
+    }
+    #[inline]
+    pub fn set_stroke_style_rgba32(&mut self, rgba32: u32) -> Result<(), Error> {
+        err_to_result(unsafe { ffi::bl_context_set_stroke_style_rgba32(&mut self.0, rgba32) })
+    }
+    #[inline]
+    pub fn set_stroke_style_gradient(&mut self, gradient: &Gradient) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_context_set_stroke_style(&mut self.0, &raw const gradient.0 as _)
+        })
+    }
+    #[inline]
+    pub fn set_stroke_start_cap(&mut self, stroke_cap: StrokeCap) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_context_set_stroke_cap(
+                &mut self.0,
+                BLStrokeCapPosition::BL_STROKE_CAP_POSITION_START,
+                stroke_cap as i32,
+            )
+        })
+    }
+    #[inline]
+    pub fn set_stroke_end_cap(&mut self, stroke_cap: StrokeCap) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_context_set_stroke_cap(
+                &mut self.0,
+                BLStrokeCapPosition::BL_STROKE_CAP_POSITION_END,
+                stroke_cap as i32,
+            )
+        })
+    }
+    #[inline]
+    pub fn stroke_path(&mut self, path: &Path) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_context_stroke_geometry(
+                &mut self.0,
+                BLGeometryType::BL_GEOMETRY_TYPE_PATH,
+                &raw const path.0 as _,
+            )
+        })
+    }
+    // Transform
+    #[inline]
+    pub fn rotate_around(&mut self, angle: f64, x: f64, y: f64) -> Result<(), Error> {
+        err_to_result(unsafe {
+            let op_data = [angle, x, y];
+            ffi::bl_context_apply_transform_op(
+                &mut self.0,
+                BLTransformOp::BL_TRANSFORM_OP_ROTATE_PT,
+                &raw const op_data as _,
             )
         })
     }

@@ -2,6 +2,7 @@
 
 use std::{ffi::CStr, ptr::null};
 
+use crate::geometry::SizeI;
 use crate::{Error, err_to_result};
 use ffi;
 
@@ -19,6 +20,22 @@ bl_enum! {
         A8     = BL_FORMAT_A8,
     }
     Default => PRgb32
+}
+
+use ffi::BLImageScaleFilter::*;
+bl_enum! {
+    /// Pixel format.
+    pub enum ScaleFilter {
+        /// Nearest neighbor filter (radius 1.0).
+        Nearest = BL_IMAGE_SCALE_FILTER_NEAREST,
+        /// Bilinear filter (radius 1.0).
+        Bilinear = BL_IMAGE_SCALE_FILTER_BILINEAR,
+        /// Bicubic filter (radius 2.0).
+        Bicubic  = BL_IMAGE_SCALE_FILTER_BICUBIC,
+        /// Lanczos filter (radius 2.0).
+        Lanczos  = BL_IMAGE_SCALE_FILTER_LANCZOS,
+    }
+    Default => Nearest
 }
 
 impl Image {
@@ -51,6 +68,12 @@ impl Image {
             ffi::bl_image_read_from_file(&mut image, filename.as_ptr(), null())
         })?;
         Ok(Image(image))
+    }
+    #[inline]
+    pub fn scale(&mut self, size: SizeI, filter: ScaleFilter) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_image_scale(&mut self.0, &self.0, &raw const size as _, filter as i32)
+        })
     }
 }
 

@@ -66,7 +66,7 @@ impl Gradient {
         }
     }
     #[inline]
-    pub fn new_radial(values: &LinearGradientValues, extend_mode: ExtendMode) -> Self {
+    pub fn new_radial(values: &RadialGradientValues, extend_mode: ExtendMode) -> Self {
         unsafe {
             Self::new(
                 ffi::BLGradientType::BL_GRADIENT_TYPE_RADIAL,
@@ -76,7 +76,7 @@ impl Gradient {
         }
     }
     #[inline]
-    pub fn new_conic(values: &LinearGradientValues, extend_mode: ExtendMode) -> Self {
+    pub fn new_conic(values: &ConicGradientValues, extend_mode: ExtendMode) -> Self {
         unsafe {
             Self::new(
                 ffi::BLGradientType::BL_GRADIENT_TYPE_CONIC,
@@ -88,6 +88,10 @@ impl Gradient {
     #[inline]
     pub fn add_stop_rgba32(&mut self, offset: f64, rgba32: u32) -> Result<(), Error> {
         err_to_result(unsafe { ffi::bl_gradient_add_stop_rgba32(&mut self.0, offset, rgba32) })
+    }
+    #[inline]
+    pub fn add_stop_rgba64(&mut self, offset: f64, rgba64: u64) -> Result<(), Error> {
+        err_to_result(unsafe { ffi::bl_gradient_add_stop_rgba64(&mut self.0, offset, rgba64) })
     }
 }
 

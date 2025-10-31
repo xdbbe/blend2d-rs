@@ -6,14 +6,18 @@ pub use error::Error;
 pub(crate) use error::err_to_result;
 
 pub mod context;
+pub mod geometry;
 pub mod gradient;
 pub mod image;
 pub mod path;
+pub mod pattern;
 
+pub use context::CompOp;
 pub use context::Context;
 pub use gradient::Gradient;
 pub use image::Image;
 pub use path::Path;
+pub use pattern::Pattern;
 
 use ffi::BLExtendMode::*;
 bl_enum! {
