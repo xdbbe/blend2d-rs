@@ -5,6 +5,7 @@ use crate::{Error, err_to_result};
 pub struct Path(pub(crate) ffi::BLPathCore);
 
 impl Path {
+    #[inline]
     pub fn new() -> Self {
         let mut path = std::mem::MaybeUninit::<ffi::BLPathCore>::uninit();
         unsafe {
@@ -12,9 +13,11 @@ impl Path {
             Path(path.assume_init())
         }
     }
+    #[inline]
     pub fn move_to(&mut self, x: f64, y: f64) -> Result<(), Error> {
         err_to_result(unsafe { ffi::bl_path_move_to(&mut self.0, x, y) })
     }
+    #[inline]
     pub fn cubic_to(
         &mut self,
         x1: f64,

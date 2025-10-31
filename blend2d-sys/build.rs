@@ -27,7 +27,7 @@ fn main() {
         .header("blend2d/src/blend2d.h")
         .layout_tests(false)
         .generate_comments(false)
-        .default_enum_style(bindgen::EnumVariation::NewType{is_bitfield: true, is_global: false})
+        .default_enum_style(bindgen::EnumVariation::ModuleConsts)
         .allowlist_function(whitelist_regex)
         .allowlist_type(whitelist_regex)
         .allowlist_var(whitelist_regex)
