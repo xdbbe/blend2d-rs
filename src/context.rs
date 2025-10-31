@@ -2,7 +2,7 @@ use std::ptr::null;
 
 use ffi;
 
-use crate::{err_to_result, image::Image, path::Path, Error, Gradient};
+use crate::{Error, Gradient, err_to_result, image::Image, path::Path};
 
 pub struct Context(ffi::BLContextCore);
 
@@ -42,13 +42,11 @@ bl_enum! {
 }
 
 impl Context {
-    #[inline]
-    pub fn new() -> Self {
-        let mut ctx = std::mem::MaybeUninit::<ffi::BLContextCore>::uninit();
-        unsafe {
-            ffi::bl_context_init(ctx.as_mut_ptr());
-            Context(ctx.assume_init())
-        }
+    pub fn render(img: &mut Image, f: fn(&mut Context) -> Result<(), Error>) -> Result<(), Error> {
+        let mut ctx = Self::default();
+        ctx.begin(img)?;
+        f(&mut ctx)?;
+        ctx.end()
     }
     #[inline]
     pub fn begin(&mut self, img: &mut Image) -> Result<(), Error> {
@@ -64,7 +62,7 @@ impl Context {
     }
     #[inline]
     pub fn fill_all(&mut self) -> Result<(), Error> {
-        err_to_result( unsafe { ffi::bl_context_fill_all(&mut self.0) })
+        err_to_result(unsafe { ffi::bl_context_fill_all(&mut self.0) })
     }
     #[inline]
     pub fn set_fill_style_rgba32(&mut self, rgba32: u32) -> Result<(), Error> {
@@ -72,7 +70,9 @@ impl Context {
     }
     #[inline]
     pub fn set_fill_style_gradient(&mut self, gradient: &Gradient) -> Result<(), Error> {
-        err_to_result(unsafe { ffi::bl_context_set_fill_style(&mut self.0, &raw const gradient.0 as _) })
+        err_to_result(unsafe {
+            ffi::bl_context_set_fill_style(&mut self.0, &raw const gradient.0 as _)
+        })
     }
     #[inline]
     pub fn fill_round_rect(
@@ -82,10 +82,16 @@ impl Context {
         w: f64,
         h: f64,
         rx: f64,
-        ry: f64
+        ry: f64,
     ) -> Result<(), Error> {
-        let rect = ffi::BLRoundRect { x, y, w, h, rx, ry};
-        err_to_result(unsafe { ffi::bl_context_fill_geometry(&mut self.0, ffi::BLGeometryType::BL_GEOMETRY_TYPE_ROUND_RECT, &raw const rect as _) })
+        let rect = ffi::BLRoundRect { x, y, w, h, rx, ry };
+        err_to_result(unsafe {
+            ffi::bl_context_fill_geometry(
+                &mut self.0,
+                ffi::BLGeometryType::BL_GEOMETRY_TYPE_ROUND_RECT,
+                &raw const rect as _,
+            )
+        })
     }
     #[inline]
     pub fn fill_path(&mut self, path: &Path) -> Result<(), Error> {
@@ -107,5 +113,25 @@ impl Context {
                 rgba32,
             )
         })
+    }
+}
+
+impl Default for Context {
+    #[inline]
+    fn default() -> Self {
+        let mut ctx = std::mem::MaybeUninit::<ffi::BLContextCore>::uninit();
+        unsafe {
+            ffi::bl_context_init(ctx.as_mut_ptr());
+            Context(ctx.assume_init())
+        }
+    }
+}
+
+impl Drop for Context {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            ffi::bl_context_destroy(&mut self.0);
+        }
     }
 }

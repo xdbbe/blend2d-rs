@@ -1,7 +1,7 @@
+use std::env::VarError;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::{env, fs, io, path::PathBuf};
-use std::env::VarError;
 
 fn add_source<P: AsRef<Path>>(cfg: &mut cc::Build, path: P) -> Result<(), io::Error> {
     for entry in fs::read_dir(path)? {
@@ -56,11 +56,9 @@ fn main() {
 
     let arch = get_env("CARGO_CFG_TARGET_ARCH").unwrap();
 
-
     if get_env("PROFILE").is_some_and(|s| s != "debug") {
         cfg.define("NDEBUG", None);
     }
-
 
     match arch.as_str() {
         "x86_64" | "i686" => {
@@ -99,12 +97,15 @@ fn main() {
 
             // AVX2
             cfg.define("BL_BUILD_OPT_AVX2", None);
-            cfg.mflags(["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx2"], "/arch:AVX2");
+            cfg.mflags(
+                ["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx2"],
+                "/arch:AVX2",
+            );
 
             // AVX512 (Disabled for now, breaks runtime detection)
             // cfg.define("BL_BUILD_OPT_AVX512", None);
             // cfg.mflags(["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx512f", "-mavx512bw", "-mavx512dq", "-mavx512cd", "-mavx512vl"], "/arch:AVX512");
-        }
+        },
         "aarch64" | "arm" => {
             // There is no runtime detection ARM
             if arch == "aarch64" {
@@ -116,8 +117,8 @@ fn main() {
                 cfg.define("BL_TARGET_OPT_ASIMD", None);
                 cfg.mflag("-mfpu=neon-vfpv4", None);
             };
-        }
-        _ => {}
+        },
+        _ => {},
     }
     let target_os = get_env("CARGO_CFG_TARGET_OS").unwrap();
 
@@ -136,14 +137,15 @@ fn main() {
             .flag("-fno-math-errno")
             .flag("-fno-threadsafe-statics")
             .flag("-fmerge-all-constants")
-            .flag("-ftree-vectorize")
-            .flag("-mllvm")
-            .flag("--disable-loop-idiom-all");
-        if target_os != "macos" { // Unsupported in apple clang
+            .flag("-ftree-vectorize");
+        if cfg.is_clang {
+            cfg.flag("-mllvm").flag("--disable-loop-idiom-all");
+        }
+        if target_os != "macos" {
+            // Unsupported in apple clang
             cfg.flag("-fno-semantic-interposition");
         }
     }
-
 
     cfg.compile("blend2d");
     match target_os.as_str() {
@@ -174,7 +176,7 @@ fn get_env(name: &str) -> Option<String> {
         Err(VarError::NotPresent) => None,
         Err(VarError::NotUnicode(s)) => {
             panic!("unrecognize env var of {name}: {:?}", s.to_string_lossy());
-        }
+        },
     }
 }
 
@@ -183,12 +185,19 @@ fn get_env(name: &str) -> Option<String> {
 struct Build {
     cfg: cc::Build,
     is_msvc: bool,
+    is_clang: bool,
 }
 
 impl Build {
     fn new(cfg: cc::Build) -> Self {
-        let is_msvc = cfg.try_get_compiler().unwrap().is_like_msvc();
-        Self { cfg, is_msvc }
+        let compiler = cfg.try_get_compiler().unwrap();
+        let is_msvc = compiler.is_like_msvc();
+        let is_clang = compiler.is_like_clang();
+        Self {
+            cfg,
+            is_msvc,
+            is_clang,
+        }
     }
 
     fn mflag(

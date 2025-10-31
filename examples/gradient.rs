@@ -1,12 +1,12 @@
-use blend2d::{context::CompOp, gradient::LinearGradientValues, image, Context, Gradient, Image, ExtendMode};
+use blend2d::{
+    Context, ExtendMode, Gradient, Image, context::CompOp, gradient::LinearGradientValues, image,
+};
 
 fn main() {
     let mut img = Image::new(480, 480, image::Format::PRgb32).expect("Unable to create image");
 
     // Attach a rendering context into `img`.
-    let mut ctx = Context::new();
-    ctx.begin(&mut img).expect("Unable to attach rendering context");
-    let render = |mut ctx: Context| {
+    Context::render(&mut img, |ctx| {
         ctx.set_comp_op(CompOp::SrcCopy)?;
         ctx.fill_all()?;
 
@@ -30,11 +30,10 @@ fn main() {
         ctx.set_fill_style_gradient(&linear)?;
 
         ctx.set_comp_op(CompOp::SrcOver)?;
-        ctx.fill_round_rect(40.0, 40.0, 400.0, 400.0, 45.5, 45.5)?;
-        ctx.end()
-    };
-    render(ctx).expect("Rendering to context failed");
+        ctx.fill_round_rect(40.0, 40.0, 400.0, 400.0, 45.5, 45.5)
+    })
+    .expect("Rendering to context failed");
 
     img.write_to_file(c"bl-getting-started-2.bmp")
-    .expect("Writing to file failed");
+        .expect("Writing to file failed");
 }

@@ -26,28 +26,39 @@ impl Image {
     pub fn new(w: i32, h: i32, format: Format) -> Result<Self, Error> {
         let mut image = std::mem::MaybeUninit::<ffi::BLImageCore>::uninit();
         unsafe {
-            err_to_result(ffi::bl_image_init_as(image.as_mut_ptr(), w, h, format as i32))?;
+            err_to_result(ffi::bl_image_init_as(
+                image.as_mut_ptr(),
+                w,
+                h,
+                format as i32,
+            ))?;
             Ok(Image(image.assume_init()))
         }
     }
     #[inline]
-    pub fn write_to_file(&mut self, filename: &CStr) -> Result<(), Error> {
-        err_to_result(unsafe {
-            ffi::bl_image_write_to_file(&mut self.0, filename.as_ptr(), null())
-        })
+    pub fn write_to_file(&self, filename: &CStr) -> Result<(), Error> {
+        err_to_result(unsafe { ffi::bl_image_write_to_file(&self.0, filename.as_ptr(), null()) })
     }
     #[inline]
     pub fn read_from_file(filename: &CStr) -> Result<Self, Error> {
-        
         let mut image = unsafe {
             let mut image = std::mem::MaybeUninit::<ffi::BLImageCore>::uninit();
             ffi::bl_image_init(image.as_mut_ptr());
             image.assume_init()
         };
-        
+
         err_to_result(unsafe {
             ffi::bl_image_read_from_file(&mut image, filename.as_ptr(), null())
         })?;
         Ok(Image(image))
+    }
+}
+
+impl Drop for Image {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            ffi::bl_image_destroy(&mut self.0);
+        }
     }
 }
