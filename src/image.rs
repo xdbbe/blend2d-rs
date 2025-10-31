@@ -36,4 +36,10 @@ impl Image {
             ffi::bl_image_write_to_file(&mut self.0, filename.as_ptr(), null())
         })
     }
+    #[inline]
+    pub fn read_from_file(&mut self, filename: &CStr) -> Result<(), Error> {
+        err_to_result(unsafe {
+            ffi::bl_image_read_from_file(&mut self.0, filename.as_ptr(), null())
+        })
+    }
 }

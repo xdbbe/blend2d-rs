@@ -106,23 +106,20 @@ fn main() {
             // cfg.mflags(["-mpopcnt", "-mpclmul", "-mbmi", "-mbmi2", "-mavx512f", "-mavx512bw", "-mavx512dq", "-mavx512cd", "-mavx512vl"], "/arch:AVX512");
         }
         "aarch64" | "arm" => {
-            // TODO: transfer flags from CMakeLists.txt
-            let is_aarch64 = arch == "aarch64";
-
-            if cfg.is_msvc {
-                cfg.define("__ARM_NEON__", None);
-            }
-            cfg.mflag(
-                if is_aarch64 {
-                    "-march=armv8-a+crc+simd"
-                } else {
-                    "-mfpu=neon"
-                },
-                None,
-            );
+            // There is no runtime detection ARM
+            if arch == "aarch64" {
+                cfg.define("BL_BUILD_OPT_ASIMD_CRYPTO", None);
+                cfg.define("BL_TARGET_OPT_ASIMD_CRYPTO", None);
+                cfg.mflag("-march=armv8-a+aes+crc+crypto", None);
+            } else {
+                cfg.define("BL_BUILD_OPT_ASIMD", None);
+                cfg.define("BL_TARGET_OPT_ASIMD", None);
+                cfg.mflag("-mfpu=neon-vfpv4", None);
+            };
         }
         _ => {}
     }
+    let target_os = get_env("CARGO_CFG_TARGET_OS").unwrap();
 
     if cfg.is_msvc {
         cfg.flag("-MP")
@@ -137,14 +134,19 @@ fn main() {
             .flag("-fno-exceptions")
             .flag("-fno-rtti")
             .flag("-fno-math-errno")
-            .flag("-fno-semantic-interposition")
             .flag("-fno-threadsafe-statics")
             .flag("-fmerge-all-constants")
-            .flag("-ftree-vectorize");
+            .flag("-ftree-vectorize")
+            .flag("-mllvm")
+            .flag("--disable-loop-idiom-all");
+        if target_os != "macos" { // Unsupported in apple clang
+            cfg.flag("-fno-semantic-interposition");
+        }
     }
 
+
     cfg.compile("blend2d");
-    match get_env("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+    match target_os.as_str() {
         "windows" => {
             println!("cargo:rustc-link-lib=user32");
             println!("cargo:rustc-link-lib=uuid");
